@@ -27,7 +27,7 @@ Let $X = (x_1, x_2, \dots, x_N)$ be an autoregressive sequence of tokens, and le
 ### 1. Vector Trajectory Velocity
 Directional displacement between consecutive sequence steps is calculated via normalized Cosine Similarity:
 
-$$S_t = \cos\left(h_t^{(l)}, h_{t+1}^{(l)}\right) = \frac{h_t^{(l)} \cdot h_{t+1}^{(l)}}{\Vert{}h_t^{(l)}\Vert{}_2 \Vert{}h_{t+1}^{(l)}\Vert{}_2}$$
+$$S_t = \cos\left(h_t^{(l)}, h_{t+1}^{(l)}\right) = \frac{h_t^{(l)} \cdot h_{t+1}^{(l)}}{\|h_t^{(l)}\|_2 \|h_{t+1}^{(l)}\|_2}$$
 
 ### 2. Rolling Window Anomaly Standardizing
 To isolate localized trajectory acceleration from background context drift, dynamic statistics are computed over a historical window $W$ of size $k = 5$:
@@ -80,6 +80,8 @@ latent-trajectory-probe/
 └── assets/
     └── comparative_trajectories.png
 ```
+
+---
 
 ## 🚀 Quickstart & Usage
 
