@@ -1,11 +1,21 @@
 # LatentTrajectory-Probe: Probing Dynamic Hidden State Trajectories & Emergent Self-Correction in Reasoning LLMs
 
+[![arXiv](https://img.shields.io/badge/arXiv-2501.XXXXX-b31b1b.svg)](https://arxiv.org)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch 2.0+](https://img.shields.io/badge/PyTorch-2.0%2B-ee4c2c.svg)](https://pytorch.org/)
 [![HuggingFace Transformers](https://img.shields.io/badge/%F0%9F%A4%97%20Transformers-4.38%2B-yellow.svg)](https://huggingface.co/docs/transformers/index)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 > **Abstract:** Autoregressive language models fine-tuned for complex mathematical reasoning exhibit non-linear state transitions—ranging from constructive self-correction ("Aha!" moments) to localized repetition loops (trajectory collapse). **LatentTrajectory-Probe** is a lightweight, layer-wise diagnostic framework that inspects intermediate transformer hidden representations $h_t^{(l)} \in \mathbb{R}^d$ token-by-token. By pairing directional cosine velocity with syntactic boundary masking and trailing-window anomaly detection, this probe disentangles genuine semantic self-correction from routine structural transitions and degenerative loops.
+
+---
+
+## 💡 Key Highlights
+
+* **Syntactic Noise Reduction:** Disentangles structural punctuation delimiters from true latent semantic shifts using an automated boundary mask operator.
+* **Dynamic Acceleration Estimation:** Replaces static thresholding with trailing-window $Z$-score standardization over local hidden state trajectories.
+* **Zero-Training Diagnostic Overhead:** Runs post-hoc over forward passes without requiring probing classifiers or auxiliary fine-tuning.
+* **Model-Agnostic Engine:** Out-of-the-box support for modern reasoning backbones (`Qwen2.5-Math`, `DeepSeek-R1-Distill`, `Llama-3`).
 
 ---
 
@@ -86,6 +96,7 @@ latent-trajectory-probe/
 ## 🚀 Quickstart & Usage
 
 ### 1. Installation
+
 ```bash
 git clone [https://github.com/your-username/latent-trajectory-probe.git](https://github.com/your-username/latent-trajectory-probe.git)
 cd latent-trajectory-probe
@@ -93,24 +104,34 @@ pip install -r requirements.txt
 ```
 
 ### 2. Execution Pipeline
-Run the full benchmarking suite and export publication-ready diagnostic plots:
+
+Run the benchmarking suite and export publication-ready diagnostic figures to `assets/comparative_trajectories.png`:
+
 ```bash
 python main.py
 ```
 
 ### 3. Programmatic API Integration
+
 ```python
 from src.engine import LatentTrajectoryAnalyzer
 from src.visualize import plot_comparative_dynamics
 
-# Initialize analyzer on target model layer
-analyzer = LatentTrajectoryAnalyzer(model_name="Qwen/Qwen2.5-Math-1.5B", layer_idx=-1)
+# Initialize analyzer on target model and layer (-1 for final hidden layer)
+analyzer = LatentTrajectoryAnalyzer(
+    model_name="Qwen/Qwen2.5-Math-1.5B", 
+    layer_idx=-1
+)
 
-# Run trajectory diagnostic engine
+# Analyze a reasoning sequence
 results = analyzer.analyze_sequence(
     text_sequence="Therefore, the side is 5. Wait! Let me check again. It is 3.",
     label="Emergent Self-Correction Evaluation"
 )
+
+# Inspect token-level diagnostics
+for token, sim, z, asm in zip(results["tokens"], results["cos_sims"], results["z_scores"], results["assessments"]):
+    print(f"Token: {token:<12} | CosSim: {sim:.4f} | Z-Score: {z:+.2f} | Assessment: {asm}")
 ```
 
 ---
@@ -119,11 +140,13 @@ results = analyzer.analyze_sequence(
 
 - [ ] **Cross-Layer Representation Divergence ($\Delta L$):** Quantifying how self-correction shifts propagate from intermediate layers ($L/2$) to final projection layers ($L$).
 - [ ] **Topological Phase Space Mapping:** Pairing trajectory velocity $S_t$ with output logit entropy $H(P(y_t \mid y_{<t}))$ to map uncertainty landscapes during reasoning pivots.
-- [ ] **Large-Scale Benchmark Probing:** Scaling empirical evaluation across MATH and GSM8K traces using reasoning models (DeepSeek-R1-Distill, Qwen2.5-Math-7B).
+- [ ] **Large-Scale Benchmark Probing:** Scaling empirical evaluation across MATH and GSM8K traces using reasoning models (`DeepSeek-R1-Distill-Qwen-14B`, `Qwen2.5-Math-7B`).
 
 ---
 
 ## 📑 Citation
+
+If you use **LatentTrajectory-Probe** in your research, please cite:
 
 ```bibtex
 @software{latent_trajectory_probe2025,
