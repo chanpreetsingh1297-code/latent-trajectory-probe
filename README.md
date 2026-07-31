@@ -79,3 +79,57 @@ latent-trajectory-probe/
 │   └── visualize.py
 └── assets/
     └── comparative_trajectories.png
+```
+
+## 🚀 Quickstart & Usage
+
+### 1. Installation
+```bash
+git clone [https://github.com/your-username/latent-trajectory-probe.git](https://github.com/your-username/latent-trajectory-probe.git)
+cd latent-trajectory-probe
+pip install -r requirements.txt
+```
+
+### 2. Execution Pipeline
+Run the full benchmarking suite and export publication-ready diagnostic plots:
+```bash
+python main.py
+```
+
+### 3. Programmatic API Integration
+```python
+from src.engine import LatentTrajectoryAnalyzer
+from src.visualize import plot_comparative_dynamics
+
+# Initialize analyzer on target model layer
+analyzer = LatentTrajectoryAnalyzer(model_name="Qwen/Qwen2.5-Math-1.5B", layer_idx=-1)
+
+# Run trajectory diagnostic engine
+results = analyzer.analyze_sequence(
+    text_sequence="Therefore, the side is 5. Wait! Let me check again. It is 3.",
+    label="Emergent Self-Correction Evaluation"
+)
+```
+
+---
+
+## 🔭 Future Research Directions
+
+- [ ] **Cross-Layer Representation Divergence ($\Delta L$):** Quantifying how self-correction shifts propagate from intermediate layers ($L/2$) to final projection layers ($L$).
+- [ ] **Topological Phase Space Mapping:** Pairing trajectory velocity $S_t$ with output logit entropy $H(P(y_t \mid y_{<t}))$ to map uncertainty landscapes during reasoning pivots.
+- [ ] **Large-Scale Benchmark Probing:** Scaling empirical evaluation across MATH and GSM8K traces using reasoning models (DeepSeek-R1-Distill, Qwen2.5-Math-7B).
+
+---
+
+## 📑 Citation
+
+```bibtex
+@software{latent_trajectory_probe2025,
+  author = {Your Name},
+  title = {LatentTrajectory-Probe: Probing Dynamic Hidden State Trajectories & Emergent Self-Correction in Reasoning LLMs},
+  year = {2025},
+  publisher = {GitHub},
+  journal = {GitHub Repository},
+  url = {[https://github.com/your-username/latent-trajectory-probe](https://github.com/your-username/latent-trajectory-probe)}
+}
+```
