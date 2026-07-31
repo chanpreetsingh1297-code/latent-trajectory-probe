@@ -1,75 +1,72 @@
-# LatentTrajectory-Probe: Probing Dynamic Hidden State Trajectories & Emergent Self-Correction in Reasoning LLMs
+# LatentTrajectory-Probe: Diagnosing Model Laziness & Trajectory Collapse in Fine-Tuned LLMs
 
-[![arXiv](https://img.shields.io/badge/arXiv-2501.XXXXX-b31b1b.svg)](https://arxiv.org)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch 2.0+](https://img.shields.io/badge/PyTorch-2.0%2B-ee4c2c.svg)](https://pytorch.org/)
 [![HuggingFace Transformers](https://img.shields.io/badge/%F0%9F%A4%97%20Transformers-4.38%2B-yellow.svg)](https://huggingface.co/docs/transformers/index)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Target Models](https://img.shields.io/badge/Target_Models-Qwen_2.5_|_VLMs-purple.svg)]()
 
-> **Abstract:** Autoregressive language models fine-tuned for complex mathematical reasoning exhibit non-linear state transitions—ranging from constructive self-correction ("Aha!" moments) to localized repetition loops (trajectory collapse). **LatentTrajectory-Probe** is a lightweight, layer-wise diagnostic framework that inspects intermediate transformer hidden representations $h_t^{(l)} \in \mathbb{R}^d$ token-by-token. By pairing directional cosine velocity with syntactic boundary masking and trailing-window anomaly detection, this probe disentangles genuine semantic self-correction from routine structural transitions and degenerative loops.
-
----
-
-## 💡 Key Highlights
-
-* **Syntactic Noise Reduction:** Disentangles structural punctuation delimiters from true latent semantic shifts using an automated boundary mask operator.
-* **Dynamic Acceleration Estimation:** Replaces static thresholding with trailing-window $Z$-score standardization over local hidden state trajectories.
-* **Zero-Training Diagnostic Overhead:** Runs post-hoc over forward passes without requiring probing classifiers or auxiliary fine-tuning.
-* **Model-Agnostic Engine:** Out-of-the-box support for modern reasoning backbones (`Qwen2.5-Math`, `DeepSeek-R1-Distill`, `Llama-3`).
+> **Overview:** Fine-tuning open-weights models (such as Qwen 2.5) for multi-step visual and textual reasoning often introduces subtle failure modes during generation—specifically **model laziness**, repetitive token looping, and latent state stagnation. **LatentTrajectory-Probe** is a lightweight diagnostic profiler that tracks the cosine angle and similarity between hidden state vector embeddings $h_t^{(l)} \in \mathbb{R}^d$ step-by-step. By pairing raw cosine angles with syntactic boundary masking and trailing-window anomaly detection, this tool pinpoints the exact token positions where a fine-tuned model becomes lazy, gets stuck in repetitive loops, or executes genuine reasoning pivots.
 
 ---
 
-## 📌 Problem Formulation & Motivation
+## 💡 Motivation & Origin Story
 
-Probing internal representations in causal language models often relies on measuring adjacent hidden state similarity across sequence steps. However, naive geometric distance metrics suffer from systematic false positives driven by two primary structural artifacts:
+This project was built following an analysis of the **"Visual Thinker"** research paper (and associated UCLA AI research setups on reasoning and chain-of-thought fine-tuning). A major challenge identified during fine-tuning evaluation is that models frequently exhibit **laziness** or degrade into repetitive token trajectories during long-horizon reasoning.
 
-1. **Syntactic Boundary Noise:** Routine transitions between structural delimiters (e.g., punctuation marks `.`, `,`, `!`) and content tokens naturally induce steep vector shifts. Standard probes misinterpret these syntactic boundary hops as semantic self-corrections or emergent pivots.
-2. **Trajectory Collapse Satiation:** Degenerative token loops produce artificially high cosine similarity clusters, creating localized attractors that obscure true reasoning shifts.
+Standard benchmark metrics only report whether the final response is correct. They fail to reveal *where* during the generation forward pass the model lost momentum.
 
-**LatentTrajectory-Probe** resolves this by applying a syntactically masked, rolling-window $Z$-score estimator over latent trajectory steps, isolating true semantic pivots from baseline syntactic fluctuations.
+**LatentTrajectory-Probe** inspects the model's internal representation trajectory step-by-step using vector embeddings:
+1. **Detecting Model Laziness:** When consecutive vector embeddings lock into ultra-high cosine similarity clusters ($S_t > 0.85$), indicating the model is repeating itself or procrastinating without updating its reasoning state.
+2. **Filtering Out Syntactic False Positives:** Delimiters (such as punctuation or newlines) naturally induce steep cosine angle shifts. Our boundary mask prevents these structural shifts from being misdiagnosed as genuine semantic transitions.
+3. **Catching Self-Correction Pivots:** Identifies sharp, non-syntactic cosine angle drops ($S_t < 0.55$) where the model dynamically corrects its trajectory ("Aha!" moments).
 
 ---
 
 ## 📐 Mathematical Framework
 
-Let $X = (x_1, x_2, \dots, x_N)$ be an autoregressive sequence of tokens, and let $h_t^{(l)} \in \mathbb{R}^d$ denote the hidden representation at layer $l$ for step $t$.
+Let $X = (x_1, x_2, \dots, x_N)$ be an autoregressive sequence, and $h_t^{(l)} \in \mathbb{R}^d$ denote the hidden vector embedding at layer $l$ for sequence step $t$.
 
-### 1. Vector Trajectory Velocity
-Directional displacement between consecutive sequence steps is calculated via normalized Cosine Similarity:
+### 1. Vector Cosine Angle & Similarity
+The directional similarity between adjacent vector embeddings is computed as:
 
 $$S_t = \cos\left(h_t^{(l)}, h_{t+1}^{(l)}\right) = \frac{h_t^{(l)} \cdot h_{t+1}^{(l)}}{\|h_t^{(l)}\|_2 \|h_{t+1}^{(l)}\|_2}$$
 
-### 2. Rolling Window Anomaly Standardizing
-To isolate localized trajectory acceleration from background context drift, dynamic statistics are computed over a historical window $W$ of size $k = 5$:
+The angular separation $\theta_t$ in latent representation space is:
+
+$$\theta_t = \arccos(S_t)$$
+
+### 2. Rolling Window Anomaly Score
+To separate background context drift from localized laziness or acceleration, statistics are computed over a historical trailing window $W$ of size $k = 5$:
 
 $$\mu_{t} = \frac{1}{k} \sum_{i=1}^{k} S_{t-i}, \quad \sigma_{t} = \sqrt{\frac{1}{k} \sum_{i=1}^{k} (S_{t-i} - \mu_t)^2} + \epsilon$$
 
-The standardized deviation score $Z_t$ quantifies relative acceleration in latent space:
+The standardized deviation score $Z_t$ measures relative acceleration or trajectory stagnation:
 
 $$Z_t = \frac{S_t - \mu_t}{\sigma_t}$$
 
-### 3. Syntactic Masking & Diagnostic Operator
-Let $\mathcal{P}$ denote the subset of structural, punctuation, and whitespace tokens. The diagnostic classification operator $\mathcal{D}(t)$ is defined as:
+### 3. Diagnostic Classifier Operator
+Let $\mathcal{P}$ denote punctuation, white-space, and formatting tokens. The transition operator $\mathcal{D}(t)$ classifies step $t$ as:
 
-$$\mathcal{D}(t) = \begin{cases} \text{Syntactic Step}, & \text{if } x_{t+1} \in \mathcal{P} \\ \text{Trajectory Collapse}, & \text{if } S_t > 0.80 \land Z_t > +1.5 \\ \text{Emergent Pivot ('Aha!'),} & \text{if } S_t < 0.55 \land Z_t < -1.5 \\ \text{Stable Continuity}, & \text{otherwise} \end{cases}$$
+$$\mathcal{D}(t) = \begin{cases} \text{Syntactic Delimiter}, & \text{if } x_{t+1} \in \mathcal{P} \\ \text{Repetitive Loop / Laziness}, & \text{if } S_t > 0.80 \land Z_t > +1.5 \\ \text{Emergent Pivot ('Aha!'),} & \text{if } S_t < 0.55 \land Z_t < -1.5 \\ \text{Stable Reasoning}, & \text{otherwise} \end{cases}$$
 
 ---
 
-## 🔬 Empirical Diagnostics & Benchmarks
+## 🔬 Diagnostic Output Matrix
 
-Evaluated against **Qwen/Qwen2.5-Math-1.5B** across two representative mathematical reasoning paths:
+Evaluated on **Qwen/Qwen2.5-Math-1.5B** across two representative generation paths:
 
-* **Scenario A (Degenerate Repetitive Loop):** `"Therefore, the side is 5. Therefore, the side is 5."`
-* **Scenario B (Emergent Self-Correction):** `"Therefore, the side is 5. Wait! Let me check again. It is 3."`
+* **Trace A (Model Laziness & Loop):** `"Therefore, the side is 5. Therefore, the side is 5."`
+* **Trace B (Emergent Correction):** `"Therefore, the side is 5. Wait! Let me check again. It is 3."`
 
-### Empirical Diagnostic Matrix
+### Token Embedding Trajectory Comparison
 
-| Sequence Context | Transition Target ($x_{t+1}$) | Cos Sim ($S_t$) | $Z_t$ Score | Unmasked Baseline | Masked Diagnostic Probe |
+| Sequence Context | Target Token ($x_{t+1}$) | Cos Sim ($S_t$) | $Z_t$ Score | Naive Baseline | Profiler Assessment |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Scenario A** | `Therefore` | 0.5124 | -2.71 | 🔥 False "Aha!" Pivot | ⚪ Syntactic Step |
-| **Scenario A** | `,` (repeat step) | 0.9082 | +3.12 | ⚠️ False Collapse | ⚪ Syntactic Step |
-| **Scenario B** | `Wait` | 0.4561 | -2.65 | 🔥 Emergence | ★ **Emergent Pivot ('Aha!')** |
-| **Scenario B** | `again` | 0.5420 | -1.78 | 🔥 Emergence | ★ **Emergent Pivot ('Aha!')** |
+| **Trace A** | `Therefore` | 0.5124 | -2.71 | 🔥 False "Aha!" Pivot | ⚪ Syntactic Step |
+| **Trace A** | `,` (repeat step) | 0.9082 | +3.12 | ⚠️ False Collapse | ⚪ Syntactic Step |
+| **Trace B** | `Wait` | 0.4561 | -2.65 | 🔥 Emergence | ★ **Emergent Pivot ('Aha!')** |
+| **Trace B** | `again` | 0.5420 | -1.78 | 🔥 Emergence | ★ **Emergent Pivot ('Aha!')** |
 
 ---
 
@@ -93,7 +90,7 @@ latent-trajectory-probe/
 
 ---
 
-## 🚀 Quickstart & Usage
+## 🚀 Quickstart & Profiling Guide
 
 ### 1. Installation
 
@@ -103,58 +100,47 @@ cd latent-trajectory-probe
 pip install -r requirements.txt
 ```
 
-### 2. Execution Pipeline
+### 2. Run Diagnostic Benchmark
 
-Run the benchmarking suite and export publication-ready diagnostic figures to `assets/comparative_trajectories.png`:
+Run the full profiler against sample reasoning traces and export trajectory plots to `assets/comparative_trajectories.png`:
 
 ```bash
 python main.py
 ```
 
-### 3. Programmatic API Integration
+### 3. Profile Your Fine-Tuned Model Checkpoint
+
+Analyze custom fine-tuned model checkpoints (e.g., Qwen 2.5) to locate where laziness or repetition occurs:
 
 ```python
 from src.engine import LatentTrajectoryAnalyzer
-from src.visualize import plot_comparative_dynamics
 
-# Initialize analyzer on target model and layer (-1 for final hidden layer)
+# Load target model (e.g., Qwen 2.5 fine-tuned checkpoint)
 analyzer = LatentTrajectoryAnalyzer(
     model_name="Qwen/Qwen2.5-Math-1.5B", 
-    layer_idx=-1
+    layer_idx=-1  # Inspect final hidden layer representations
 )
 
-# Analyze a reasoning sequence
+# Run embedding cosine trajectory analysis
 results = analyzer.analyze_sequence(
     text_sequence="Therefore, the side is 5. Wait! Let me check again. It is 3.",
-    label="Emergent Self-Correction Evaluation"
+    label="Qwen 2.5 Reasoning Diagnostics"
 )
 
-# Inspect token-level diagnostics
-for token, sim, z, asm in zip(results["tokens"], results["cos_sims"], results["z_scores"], results["assessments"]):
-    print(f"Token: {token:<12} | CosSim: {sim:.4f} | Z-Score: {z:+.2f} | Assessment: {asm}")
+# Print step-by-step vector trajectory scores
+for token, sim, z, status in zip(results["tokens"], results["cos_sims"], results["z_scores"], results["assessments"]):
+    print(f"Token: {token:<12} | CosSim: {sim:.4f} | Z-Score: {z:+.2f} | Status: {status}")
 ```
 
 ---
 
-## 🔭 Future Research Directions
+## 📚 References & Acknowledgments
 
-- [ ] **Cross-Layer Representation Divergence ($\Delta L$):** Quantifying how self-correction shifts propagate from intermediate layers ($L/2$) to final projection layers ($L$).
-- [ ] **Topological Phase Space Mapping:** Pairing trajectory velocity $S_t$ with output logit entropy $H(P(y_t \mid y_{<t}))$ to map uncertainty landscapes during reasoning pivots.
-- [ ] **Large-Scale Benchmark Probing:** Scaling empirical evaluation across MATH and GSM8K traces using reasoning models (`DeepSeek-R1-Distill-Qwen-14B`, `Qwen2.5-Math-7B`).
+* Inspired by the **"Visual Thinker"** paper and research on fine-tuning reasoning models (including UCLA AI research on chain-of-thought trajectories and fine-tuning behaviors in the Qwen 2.5 series).
+* Built using Hugging Face `transformers` and PyTorch.
 
 ---
 
-## 📑 Citation
+## 📄 License
 
-If you use **LatentTrajectory-Probe** in your research, please cite:
-
-```bibtex
-@software{latent_trajectory_probe2025,
-  author = {Your Name},
-  title = {LatentTrajectory-Probe: Probing Dynamic Hidden State Trajectories & Emergent Self-Correction in Reasoning LLMs},
-  year = {2025},
-  publisher = {GitHub},
-  journal = {GitHub Repository},
-  url = {[https://github.com/your-username/latent-trajectory-probe](https://github.com/your-username/latent-trajectory-probe)}
-}
-```
+Distributed under the [MIT License](LICENSE).
